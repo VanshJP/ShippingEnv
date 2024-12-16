@@ -1,2 +1,2 @@
 from .environment import Environment
-from .type import Action
+from .type import ShipMove

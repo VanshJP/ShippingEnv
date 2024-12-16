@@ -1,4 +1,10 @@
-class Action:
+class ActionType:
+    MOVE_SHIP = "move_ship"
+    SELECT_PORT = "select_port"
+    TAKE_FUEL = "take_fuel"
+    TAKE_CARGO = "take_cargo"
+
+class ShipMove:
     """
     Enum for action space where values are (x,y) tuple 
     """
@@ -19,9 +25,6 @@ class Entity:
     BOAT = 5
     STORM = 6
     TRAVEL = 7
-
-    def __str__(self):
-        return str(self.value)
 
 class Color:
     """

@@ -21,11 +21,10 @@ if __name__ == "__main__":
 
     try:
         for _ in range(1000):
-            state, reward, done = env.step()
+            action = env.sample_action()
+            state, reward, done, meta = env.step(action)
             env.update_storms()
             env.render_real_time()
-            if done:
-                print(f"Completed the journey with reward: {reward}")
-                state = env.reset()
+            if done: break
     except KeyboardInterrupt:
         cv2.destroyAllWindows()
