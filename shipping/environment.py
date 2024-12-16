@@ -7,15 +7,13 @@ from .util import calculate_euclidean_distance
 
 class Environment:
     def __init__(self, map_path, game_size=(100,100)):
-        # Configurations
+        # ** Configurations
         self.size_game = game_size
 
         self.port_positions = []
         self.port_cargo = []
 
-        self.state = []
-        self.done = False
-        self.reward = 0
+        self.ship_position = []
         self.cargo = 0
         self.fuel = 200
         self.destination_port_index = None
@@ -30,8 +28,7 @@ class Environment:
 
     def _initialize_map(self, map_path):
         self.np_game = cv2.imread(map_path, cv2.IMREAD_GRAYSCALE)
-        if self.np_game is None:
-            raise FileNotFoundError(f"Cannot read the image at {map_path}")
+        if self.np_game is None: raise FileNotFoundError(f"Cannot read the image at {map_path}")
         
         x_min, x_max = 100, 300
         y_min, y_max = 50, 200
@@ -219,7 +216,6 @@ class Environment:
         # Display stats
         cv2.putText(frame_resized, f"Fuel: {self.fuel:.2f}", (10, 20), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         cv2.putText(frame_resized, f"Cargo: {self.cargo}", (10, 40), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-        cv2.putText(frame_resized, f"Reward: {self.reward}", (10, 60), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
 
         # Display port info
         port_info_y = 80
@@ -247,8 +243,8 @@ class Environment:
         if len(self.port_positions) == 0: raise Exception("No ports available")
         random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
-        # Choose a new port rather than a port ship is currently on
-        while self.port_positions[random_destination_index] == self.state:
+        # ** Choose a new port rather than a port ship is currently on
+        while self.port_positions[random_destination_index] == self.ship_position:
             random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         return random_destination_index
@@ -256,20 +252,42 @@ class Environment:
     def _sample_random_move(self):
         moves_list = [ShipMove.NORTH, ShipMove.EAST, ShipMove.SOUTH, ShipMove.WEST]
         return random.choice(moves_list)
+    
+    def _build_state(self):
+        ship = {
+            "position": self.ship_position,
+            "fuel": self.fuel,
+            "cargo": self.fuel,
+            "destination_port_index": self.destination_port_index
+        }
+
+        ports = []
+
+        for idx, port_position in enumerate(self.port_positions):
+            current_port = {
+                "index": idx,
+                "position": port_position,
+                "cargo": self.port_cargo[idx]
+            }
+            ports.append(current_port)
+
+        return {
+            "ship": ship,
+            "ports": ports
+        }
 
     def reset(self):
         self.np_game[((self.np_game == Entity.BOAT) + (self.np_game == Entity.TRAVEL))] = Entity.WATER
-        self.done = False
-        self.reward = 0
+
         self.cargo = 0
         self.fuel = 100
         self.destination_port_index = self._sample_random_port()
 
         destination_port = self.port_positions[self.destination_port_index]
         self.np_game[destination_port[0], destination_port[1]] = Entity.BOAT
-        self.state = destination_port
+        self.ship_position = destination_port
 
-        return self.state
+        return self._build_state()
 
     def sample_action(self):
         if self.destination_port_index == None:
@@ -284,53 +302,58 @@ class Environment:
         # Select port first before moving ship
         if self.destination_port_index == None: raise Exception("Cannot move without destination port")
 
+        reward, done = 0, False
+
         move_x, move_y = move
-        ship_x, ship_y = self.state
+        ship_x, ship_y = self.ship_position
         new_x, new_y = ship_x + move_x, ship_y + move_y
 
         if not self._is_within_map(new_x, new_y): raise ValueError("Move is out of range")
 
-        # Check if ship has enough fuel to move to desired space
+        # ** Check if ship has enough fuel to move to desired space
         fuel_cost = self._calculate_fuel_cost([ship_x, ship_y], [new_x, new_y])
         if self.fuel < fuel_cost:
-            self.reward -= 10
-            self.done = True
+            reward -= 10
+            done = True
 
-        # Remove this if storm is no longer considered
-        # Penalize ship if within storm
+        # ** Penalize ship if within storm [remove this if storm is no longer considered]
         if self._is_in_storm(new_x, new_y):
-            self.reward -= 5
+            reward -= 5
             if random.random() < 0.03:
                 self.cargo = 0
-                self.reward -= 50
+                reward -= 50
                 print("Lost all cargo in the storm!")
             if random.random() < 0.05:
                 move_x, move_y = 0, 0
 
-        # Manuvering process
+        # ** Manuvering process
         if self.np_game[new_x, new_y] == Entity.GROUND:
-            self.reward -= 5
+            reward -= 5
         else:
             self.np_game[ship_x, ship_y] = Entity.TRAVEL
             self.np_game[new_x, new_y] = Entity.BOAT
-            self.state = [new_x, new_y]
+            self.ship_position = [new_x, new_y]
             self.fuel -= fuel_cost
-            self.reward -= 1
+            reward -= 1
 
-        if self.state == self.port_positions[self.destination_port_index]:
+        if self.ship_position == self.port_positions[self.destination_port_index]:
             drop_off, pick_up = self.port_cargo[self.destination_port_index]
 
-            # Process cargo
+            # ** Process cargo
             self.cargo -= drop_off
             self.cargo = max(0, self.cargo)
             self.cargo += pick_up
 
-            self.done = True
-            self.reward += 100
+            self.destination_port_index = None
+            done = True
+            reward += 100
+
+        return reward, done
 
     def step(self, action):
         if len(self.port_positions) == 0: raise Exception("No ports available")
 
+        reward, done = 0, False
         action_category, action_value = action
         match action_category:
             case ActionType.SELECT_PORT:
@@ -339,8 +362,8 @@ class Environment:
                 else:
                     raise IndexError("Port index is out of range")
             case ActionType.MOVE_SHIP:
-                self._move_ship(action_value)
+                reward, done = self._move_ship(action_value)
             case _:
                 raise ValueError("Action category unknown")
         
-        return None, self.reward, self.done
+        return self._build_state(), reward, done
