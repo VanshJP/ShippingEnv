@@ -22,7 +22,7 @@ if __name__ == "__main__":
     try:
         for _ in range(1000):
             action = env.sample_action()
-            state, reward, done = env.step(action)
+            state, reward, done, meta = env.step(action)
             env.update_storms()
             env.render_real_time()
             if done: break

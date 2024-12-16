@@ -3,7 +3,7 @@ import cv2
 import random
 
 from .type import Color, Entity, ActionType, ShipMove
-from .util import calculate_euclidean_distance
+from .util import calculate_euclidean_distance, normalize
 
 class Environment:
     def __init__(self, map_path, game_size=(100,100)):
@@ -11,6 +11,7 @@ class Environment:
         self.size_game = game_size
 
         self.port_positions = []
+        self.port_fuel = []
         self.port_cargo = []
 
         self.ship_position = []
@@ -44,13 +45,15 @@ class Environment:
             raise ValueError("Coordinates not within map")
 
         self.port_positions.append(pos)
-        self.port_cargo.append([random.randint(5, 20), random.randint(5, 20)])
+        self.port_fuel.append(random.randint(5, 20))
+        self.port_cargo.append(random.randint(5, 20))
         self.np_game[x, y] = Entity.PORT
     
     def remove_port(self, idx):
         if 0 <= idx < self.port_positions and 0 <= idx < self.port_cargo:
             x, y = self.port_positions[idx]
             self.np_game[x, y] = Entity.GROUND
+            self.port_fuel.pop(idx)
             self.port_cargo.pop(idx)
             return self.port_positions.pop(idx)
         else:
@@ -219,8 +222,8 @@ class Environment:
 
         # Display port info
         port_info_y = 80
-        for port_index, cargo in enumerate(self.port_cargo):
-            cv2.putText(frame_resized, f"P{port_index + 1} - Drop: {cargo[0]}, Pick: {cargo[1]}", 
+        for idx in range(len(self.port_positions)):
+            cv2.putText(frame_resized, f"P{idx + 1} - Cargo: {self.port_cargo[idx]} - Fuel: {self.port_fuel[idx]}", 
                        (10, port_info_y), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
             port_info_y += 20
 
@@ -239,6 +242,12 @@ class Environment:
                     return True
         return False
     
+    def _is_ship_at_port(self):
+        for idx, port_position in enumerate(self.port_positions):
+            if port_position == self.port_positions:
+                return idx
+        return None
+    
     def _sample_random_port(self):
         if len(self.port_positions) == 0: raise Exception("No ports available")
         random_destination_index = random.randint(0, len(self.port_positions) - 1)
@@ -249,9 +258,47 @@ class Environment:
 
         return random_destination_index
     
+    def _sample_random_cargo(self, port_idx):
+        return random.randint(1, self.port_cargo[port_idx])
+
+    def _sample_random_fuel(self, port_idx):
+        return random.randint(1, self.fuel[port_idx])
+    
     def _sample_random_move(self):
         moves_list = [ShipMove.NORTH, ShipMove.EAST, ShipMove.SOUTH, ShipMove.WEST]
         return random.choice(moves_list)
+    
+    def _calculate_cargo_loss(self):
+        """
+        Generate cargo loss using a custom probabilistic approach with random.
+        
+        Args:
+            total_cargo (int): Total amount of cargo
+        
+        Returns:
+            int: Amount of cargo lost
+        """
+        # Generate a random number to determine loss type
+        loss_type = random.random()
+
+        # Low probability of losing nothing (10% chance)
+        if loss_type < 0.1:
+            return 0
+        
+        # Low probability of losing everything (10% chance)
+        elif loss_type > 0.9:
+            return self.cargo
+        
+        # Medium probability of losing some cargo (80% of cases)
+        else:
+            # Use beta distribution to create a more nuanced loss
+            # beta generates a value between 0 and 1
+            beta_loss = random.betavariate(2, 2)
+            
+            # Scale the beta distribution to cargo amount
+            loss = int(beta_loss * self.cargo)
+            
+            return loss
     
     def _build_state(self):
         ship = {
@@ -267,6 +314,7 @@ class Environment:
             current_port = {
                 "index": idx,
                 "position": port_position,
+                "fuel": self.port_fuel[idx],
                 "cargo": self.port_cargo[idx]
             }
             ports.append(current_port)
@@ -290,12 +338,25 @@ class Environment:
         return self._build_state()
 
     def sample_action(self):
+        current_port_idx = self._is_ship_at_port()
         if self.destination_port_index == None:
             # If no destination port selected, randomly return an index
             return [ActionType.SELECT_PORT, self._sample_random_port()]
+        elif self.cargo == 0 and current_port_idx is not None:
+            # If destination port selected, but no cargo
+            return [ActionType.TAKE_CARGO, self._sample_random_cargo(current_port_idx)]
+        elif self.fuel == 0 and current_port_idx is not None:
+            # If destination port selected, but no fuel
+            return [ActionType.TAKE_FUEL, self._sample_random_fuel(current_port_idx)]
         else:
             # If destination port is selected, move a random location
             return [ActionType.MOVE_SHIP, self._sample_random_move()]
+    
+    def _select_port(self, value):
+        if 0 <= value < len(self.port_positions): self.destination_port_index = value
+        else: raise IndexError("Port index is out of range")
+
+        return 0, False
         
     def _move_ship(self, move):
         if len(move) != 2: raise ValueError("Move needs to be of format (x,y) or [x, y]")
@@ -329,41 +390,70 @@ class Environment:
         # ** Manuvering process
         if self.np_game[new_x, new_y] == Entity.GROUND:
             reward -= 5
-        else:
-            self.np_game[ship_x, ship_y] = Entity.TRAVEL
-            self.np_game[new_x, new_y] = Entity.BOAT
+        else: 
+            # ** Move ship
             self.ship_position = [new_x, new_y]
             self.fuel -= fuel_cost
             reward -= 1
 
+            # ** Update graphics
+            self.np_game[ship_x, ship_y] = Entity.TRAVEL
+            self.np_game[new_x, new_y] = Entity.BOAT
+
+        # ** Losing cargo process
+        min_capacity, max_capacity = 0, 50
+        likelihood_of_losing_cargo = normalize(self.cargo, max_capacity, min_capacity)
+        if random.random() <= likelihood_of_losing_cargo:
+            cargo_loss = self._calculate_cargo_loss()
+            self.cargo -= cargo_loss
+            reward -= cargo_loss * -3
+
         if self.ship_position == self.port_positions[self.destination_port_index]:
-            drop_off, pick_up = self.port_cargo[self.destination_port_index]
+            drop_off, pick_up = self.cargo, self.port_cargo[self.destination_port_index]
 
             # ** Process cargo
-            self.cargo -= drop_off
-            self.cargo = max(0, self.cargo)
+            self.cargo = 0
+            reward += drop_off * 2
             self.cargo += pick_up
 
             self.destination_port_index = None
-            done = True
             reward += 100
 
         return reward, done
+    
+    def _take_cargo(self, value):
+        current_port_idx = self._is_ship_at_port()
+        if current_port_idx is None: raise Exception("Not currently at port")
+
+        if 0 < value <= self.port_cargo[current_port_idx]: self.cargo = value
+        else: raise ValueError("Invalid fuel amount")
+
+        return 0, False
+
+    def _take_fuel(self, value):
+        current_port_idx = self._is_ship_at_port()
+        if current_port_idx is None: raise Exception("Not currently at port")
+
+        if 0 < value <= self.port_fuel[current_port_idx]: self.fuel = value
+        else: raise ValueError("Invalid fuel amount")
+
+        return 0, False
 
     def step(self, action):
         if len(self.port_positions) == 0: raise Exception("No ports available")
 
-        reward, done = 0, False
+        reward, done, meta = 0, False, {}
         action_category, action_value = action
         match action_category:
             case ActionType.SELECT_PORT:
-                if 0 <= action_value < len(self.port_positions):
-                    self.destination_port_index = action_value
-                else:
-                    raise IndexError("Port index is out of range")
+                reward, done = self._select_port(action_value)
+            case ActionType.TAKE_CARGO:
+                reward, done = self._take_cargo(action_value)
+            case ActionType.TAKE_FUEL:
+                reward, done = self._take_fuel(action_value)
             case ActionType.MOVE_SHIP:
                 reward, done = self._move_ship(action_value)
             case _:
                 raise ValueError("Action category unknown")
         
-        return self._build_state(), reward, done
+        return self._build_state(), reward, done, meta
