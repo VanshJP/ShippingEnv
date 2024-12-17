@@ -1,6 +1,5 @@
 import cv2
 import sarsa
-from sarsa import SARSAAgent
 
 from shipping import Environment
 
@@ -30,7 +29,6 @@ if __name__ == "__main__":
             env.render_real_time()
             if done: break
         '''
-        #sarsaBot = sarsa.SARSAAgent(env, 10000, 4)
         sarsa.train_agent(env)
 
     except KeyboardInterrupt:

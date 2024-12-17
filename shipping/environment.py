@@ -5,8 +5,9 @@ import random
 from .type import Color, Entity, ActionType, ShipMove
 from .util import calculate_euclidean_distance, normalize
 
+
 class Environment:
-    def __init__(self, map_path, game_size=(100,100)):
+    def __init__(self, map_path, game_size=(100, 100)):
         # ** Configurations
         self.size_game = game_size
 
@@ -17,8 +18,9 @@ class Environment:
         self.ship_position = []
         self.cargo = 0
         self.fuel = 200
+        self.origin_port_index = None
         self.destination_port_index = None
-        
+
         self.storm_positions = []
         self.storm_active = {}
         self.storm_size = {}
@@ -30,7 +32,7 @@ class Environment:
     def _initialize_map(self, map_path):
         self.np_game = cv2.imread(map_path, cv2.IMREAD_GRAYSCALE)
         if self.np_game is None: raise FileNotFoundError(f"Cannot read the image at {map_path}")
-        
+
         x_min, x_max = 100, 300
         y_min, y_max = 50, 200
 
@@ -38,7 +40,7 @@ class Environment:
         self.np_game = cv2.resize(self.np_game, self.size_game, interpolation=cv2.INTER_AREA)
         _, self.np_game = cv2.threshold(self.np_game, 128, 1, cv2.THRESH_BINARY)
         self.np_game = self.np_game.astype(int)
-    
+
     def add_port(self, pos):
         x, y = pos[0], pos[1]
         if not self._is_within_map(x, y):
@@ -48,7 +50,7 @@ class Environment:
         self.port_fuel.append(random.randint(5, 20))
         self.port_cargo.append(random.randint(5, 20))
         self.np_game[x, y] = Entity.PORT
-    
+
     def remove_port(self, idx):
         if 0 <= idx < self.port_positions and 0 <= idx < self.port_cargo:
             x, y = self.port_positions[idx]
@@ -58,7 +60,7 @@ class Environment:
             return self.port_positions.pop(idx)
         else:
             raise IndexError("Invalid index")
-    
+
     def add_storm(self, pos):
         i = len(self.storm_positions)
         self.storm_positions.append(pos)
@@ -72,7 +74,7 @@ class Environment:
         self.storm_size[i] = random.randint(5, 10)
         self.storm_movement_range[i] = (
             (-2, 2),  # x movement range
-            (-2, 2)   # y movement range
+            (-2, 2)  # y movement range
         )
 
     def remove_storm(self, idx):
@@ -91,8 +93,8 @@ class Environment:
         """
         Checks if the given coordinates are within the game map boundaries.
 
-        This method determines whether the specified x and y coordinates 
-        fall inside the game's map dimensions. It verifies that the coordinates 
+        This method determines whether the specified x and y coordinates
+        fall inside the game's map dimensions. It verifies that the coordinates
         are non-negative and less than the map's width and height.
 
         Args:
@@ -100,7 +102,7 @@ class Environment:
             y (int): The y-coordinate to check.
 
         Returns:
-            bool: True if the coordinates are within the map boundaries, 
+            bool: True if the coordinates are within the map boundaries,
                 False otherwise.
 
         Example:
@@ -189,7 +191,7 @@ class Environment:
 
     def render_real_time(self, render_size=(355, 533)):
         np_render = np.zeros((self.np_game.shape[0], self.np_game.shape[1], 3), dtype="uint8")
-        
+
         np_render[self.np_game == Entity.WATER] = Color.WATER
         np_render[self.np_game == Entity.GROUND] = Color.GROUND
 
@@ -215,7 +217,7 @@ class Environment:
 
         frame_resized = cv2.resize(np_render, render_size, interpolation=cv2.INTER_AREA)
         font = cv2.FONT_HERSHEY_SIMPLEX
-        
+
         # Display stats
         cv2.putText(frame_resized, f"Fuel: {self.fuel:.2f}", (10, 20), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         cv2.putText(frame_resized, f"Cargo: {self.cargo}", (10, 40), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
@@ -223,8 +225,8 @@ class Environment:
         # Display port info
         port_info_y = 80
         for idx in range(len(self.port_positions)):
-            cv2.putText(frame_resized, f"P{idx + 1} - Cargo: {self.port_cargo[idx]} - Fuel: {self.port_fuel[idx]}", 
-                       (10, port_info_y), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(frame_resized, f"P{idx + 1} - Cargo: {self.port_cargo[idx]} - Fuel: {self.port_fuel[idx]}",
+                        (10, port_info_y), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
             port_info_y += 20
 
         cv2.imshow("Environment", frame_resized)
@@ -233,48 +235,51 @@ class Environment:
             cv2.destroyAllWindows()
             exit()
 
-
     def _is_in_storm(self, x, y):
         for storm_index, active in self.storm_active.items():
             if active:
-                if (self.storm_positions[storm_index][0][0] <= x < self.storm_positions[storm_index][0][1] and 
-                    self.storm_positions[storm_index][1][0] <= y < self.storm_positions[storm_index][1][1]):
+                if (self.storm_positions[storm_index][0][0] <= x < self.storm_positions[storm_index][0][1] and
+                        self.storm_positions[storm_index][1][0] <= y < self.storm_positions[storm_index][1][1]):
                     return True
         return False
-    
+
     def _is_ship_at_port(self):
+        """
+        Determines which port ship is currently on and returns the index of that port.
+        If the ship is not at any port, function returns `None`
+        """
         for idx, port_position in enumerate(self.port_positions):
             if port_position == self.port_positions:
                 return idx
         return None
-    
+
     def _sample_random_port(self):
         if len(self.port_positions) == 0: raise Exception("No ports available")
         random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         # ** Choose a new port rather than a port ship is currently on
-        while self.port_positions[random_destination_index] == self.ship_position:
+        while random_destination_index == self.origin_port_index:
             random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         return random_destination_index
-    
+
     def _sample_random_cargo(self, port_idx):
         return random.randint(1, self.port_cargo[port_idx])
 
     def _sample_random_fuel(self, port_idx):
         return random.randint(1, self.fuel[port_idx])
-    
+
     def _sample_random_move(self):
         moves_list = [ShipMove.NORTH, ShipMove.EAST, ShipMove.SOUTH, ShipMove.WEST]
         return random.choice(moves_list)
-    
+
     def _calculate_cargo_loss(self):
         """
         Generate cargo loss using a custom probabilistic approach with random.
-        
+
         Args:
             total_cargo (int): Total amount of cargo
-        
+
         Returns:
             int: Amount of cargo lost
         """
@@ -284,27 +289,28 @@ class Environment:
         # Low probability of losing nothing (10% chance)
         if loss_type < 0.1:
             return 0
-        
+
         # Low probability of losing everything (10% chance)
         elif loss_type > 0.9:
             return self.cargo
-        
+
         # Medium probability of losing some cargo (80% of cases)
         else:
             # Use beta distribution to create a more nuanced loss
             # beta generates a value between 0 and 1
             beta_loss = random.betavariate(2, 2)
-            
+
             # Scale the beta distribution to cargo amount
             loss = int(beta_loss * self.cargo)
-            
+
             return loss
-    
+
     def _build_state(self):
         ship = {
             "position": self.ship_position,
             "fuel": self.fuel,
             "cargo": self.fuel,
+            "origin_port_index": self.origin_port_index,
             "destination_port_index": self.destination_port_index
         }
 
@@ -327,13 +333,18 @@ class Environment:
     def reset(self):
         self.np_game[((self.np_game == Entity.BOAT) + (self.np_game == Entity.TRAVEL))] = Entity.WATER
 
-        self.cargo = 0
+        self.cargo = 5
         self.fuel = 100
+        self.origin_port_index = self._sample_random_port()
         self.destination_port_index = self._sample_random_port()
 
-        destination_port = self.port_positions[self.destination_port_index]
-        self.np_game[destination_port[0], destination_port[1]] = Entity.BOAT
-        self.ship_position = destination_port
+        # Ensure that origin is different from destination
+        while self.origin_port_index == self.destination_port_index:
+            self.destination_port_index = self._sample_random_port()
+
+        current_port = self.port_positions[self.origin_port_index]
+        self.np_game[current_port[0], current_port[1]] = Entity.BOAT
+        self.ship_position = current_port
 
         return self._build_state()
 
@@ -351,13 +362,16 @@ class Environment:
         else:
             # If destination port is selected, move a random location
             return [ActionType.MOVE_SHIP, self._sample_random_move()]
-    
-    def _select_port(self, value):
-        if 0 <= value < len(self.port_positions): self.destination_port_index = value
-        else: raise IndexError("Port index is out of range")
 
-        return 0, False
-        
+    def _select_port(self, value):
+        if 0 <= value < len(self.port_positions):
+            if self.origin_port_index == value: raise Exception("Destination port must be different from current one")
+            self.destination_port_index = value
+        else:
+            raise IndexError("Port index is out of range")
+
+        return -5, False
+
     def _move_ship(self, move):
         if len(move) != 2: raise ValueError("Move needs to be of format (x,y) or [x, y]")
         # Select port first before moving ship
@@ -390,7 +404,7 @@ class Environment:
         # ** Manuvering process
         if self.np_game[new_x, new_y] == Entity.GROUND:
             reward -= 5
-        else: 
+        else:
             # ** Move ship
             self.ship_position = [new_x, new_y]
             self.fuel -= fuel_cost
@@ -406,7 +420,7 @@ class Environment:
         if random.random() <= likelihood_of_losing_cargo:
             cargo_loss = self._calculate_cargo_loss()
             self.cargo -= cargo_loss
-            reward -= cargo_loss * -3
+            reward -= cargo_loss * 3
 
         if self.ship_position == self.port_positions[self.destination_port_index]:
             drop_off, pick_up = self.cargo, self.port_cargo[self.destination_port_index]
@@ -416,28 +430,33 @@ class Environment:
             reward += drop_off * 2
             self.cargo += pick_up
 
+            self.origin_port_index = self.destination_port_index
             self.destination_port_index = None
             reward += 100
 
         return reward, done
-    
+
     def _take_cargo(self, value):
         current_port_idx = self._is_ship_at_port()
         if current_port_idx is None: raise Exception("Not currently at port")
 
-        if 0 < value <= self.port_cargo[current_port_idx]: self.cargo = value
-        else: raise ValueError("Invalid fuel amount")
+        if 0 < value <= self.port_cargo[current_port_idx]:
+            self.cargo = value
+        else:
+            raise ValueError("Invalid fuel amount")
 
-        return 0, False
+        return 15, False
 
     def _take_fuel(self, value):
         current_port_idx = self._is_ship_at_port()
         if current_port_idx is None: raise Exception("Not currently at port")
 
-        if 0 < value <= self.port_fuel[current_port_idx]: self.fuel = value
-        else: raise ValueError("Invalid fuel amount")
+        if 0 < value <= self.port_fuel[current_port_idx]:
+            self.fuel = value
+        else:
+            raise ValueError("Invalid fuel amount")
 
-        return 0, False
+        return 10, False
 
     def step(self, action):
         if len(self.port_positions) == 0: raise Exception("No ports available")
@@ -455,5 +474,5 @@ class Environment:
                 reward, done = self._move_ship(action_value)
             case _:
                 raise ValueError("Action category unknown")
-        
+
         return self._build_state(), reward, done, meta
