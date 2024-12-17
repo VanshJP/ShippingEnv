@@ -408,7 +408,7 @@ class Environment:
         if random.random() <= likelihood_of_losing_cargo:
             cargo_loss = self._calculate_cargo_loss()
             self.cargo -= cargo_loss
-            reward -= cargo_loss * -3
+            reward -= cargo_loss * 3
 
         if self.ship_position == self.port_positions[self.destination_port_index]:
             drop_off, pick_up = self.cargo, self.port_cargo[self.destination_port_index]
