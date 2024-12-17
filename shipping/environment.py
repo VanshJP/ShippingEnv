@@ -253,7 +253,7 @@ class Environment:
         random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         # ** Choose a new port rather than a port ship is currently on
-        while self.port_positions[random_destination_index] == self.ship_position:
+        while self.port_positions[random_destination_index] == self.ship_position or random_destination_index == self.destination_port_index:
             random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         return random_destination_index
@@ -353,7 +353,9 @@ class Environment:
             return [ActionType.MOVE_SHIP, self._sample_random_move()]
     
     def _select_port(self, value):
-        if 0 <= value < len(self.port_positions): self.destination_port_index = value
+        if 0 <= value < len(self.port_positions):
+            if self.destination_port_index == value: raise Exception("Destination port must be different from current one")
+            self.destination_port_index = value
         else: raise IndexError("Port index is out of range")
 
         return 0, False
