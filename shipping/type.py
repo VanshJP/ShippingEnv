@@ -1,8 +1,8 @@
 class ActionType:
-    MOVE_SHIP = "move_ship"
-    SELECT_PORT = "select_port"
-    TAKE_FUEL = "take_fuel"
-    TAKE_CARGO = "take_cargo"
+    MOVE_SHIP = 1
+    SELECT_PORT = 2
+    TAKE_FUEL = 3
+    TAKE_CARGO = 4
 
 class ShipMove:
     """

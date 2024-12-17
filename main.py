@@ -1,4 +1,6 @@
 import cv2
+import sarsa
+from sarsa import SARSAAgent
 
 from shipping import Environment
 
@@ -20,11 +22,16 @@ if __name__ == "__main__":
     state = env.reset()
 
     try:
+        '''
         for _ in range(1000):
             action = env.sample_action()
             state, reward, done, meta = env.step(action)
             env.update_storms()
             env.render_real_time()
             if done: break
+        '''
+        #sarsaBot = sarsa.SARSAAgent(env, 10000, 4)
+        sarsa.train_agent(env)
+
     except KeyboardInterrupt:
         cv2.destroyAllWindows()
