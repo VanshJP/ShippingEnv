@@ -151,17 +151,6 @@ from shipping import environment
 class SARSAAgent:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, min_exploration_rate=0.01,
                  exploration_decay_rate=0.995):
-        """
-        Initialize the SARSA agent.
-
-        Args:
-            env (Environment): Game environment
-            learning_rate (float): Rate at which the agent learns
-            discount_factor (float): Discount factor for future rewards
-            exploration_rate (float): Initial exploration rate (epsilon)
-            min_exploration_rate (float): Minimum exploration rate
-            exploration_decay_rate (float): Rate at which exploration decays
-        """
         self.env = env
 
         # Q-table to store state-action values
@@ -274,16 +263,6 @@ class SARSAAgent:
 
 
 def train_agent(env, num_episodes=100000):
-    """
-    Train the SARSA agent in the environment.
-
-    Args:
-        env (Environment): Game environment
-        num_episodes (int): Number of training episodes
-
-    Returns:
-        SARSAAgent: Trained agent
-    """
     # Initialize the agent with the environment
     agent = SARSAAgent(env)
 
@@ -326,9 +305,6 @@ def train_agent(env, num_episodes=100000):
                 f"Episode {episode}, Average Reward: {np.mean(total_rewards[-100:])}, Exploration Rate: {agent.epsilon:.4f}")
 
     return agent
-
-# Usage example:
-# trained_agent = train_agent(environment)
 
 
 
