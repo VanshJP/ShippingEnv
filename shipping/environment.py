@@ -17,6 +17,7 @@ class Environment:
         self.ship_position = []
         self.cargo = 0
         self.fuel = 200
+        self.origin_port_index = None
         self.destination_port_index = None
         
         self.storm_positions = []
@@ -243,6 +244,10 @@ class Environment:
         return False
     
     def _is_ship_at_port(self):
+        """
+        Determines which port ship is currently on and returns the index of that port.
+        If the ship is not at any port, function returns `None`
+        """
         for idx, port_position in enumerate(self.port_positions):
             if port_position == self.port_positions:
                 return idx
@@ -253,7 +258,7 @@ class Environment:
         random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         # ** Choose a new port rather than a port ship is currently on
-        while self.port_positions[random_destination_index] == self.ship_position or random_destination_index == self.destination_port_index:
+        while random_destination_index == self.origin_port_index:
             random_destination_index = random.randint(0, len(self.port_positions) - 1)
 
         return random_destination_index
@@ -305,6 +310,7 @@ class Environment:
             "position": self.ship_position,
             "fuel": self.fuel,
             "cargo": self.fuel,
+            "origin_port_index": self.origin_port_index,
             "destination_port_index": self.destination_port_index
         }
 
@@ -329,11 +335,16 @@ class Environment:
 
         self.cargo = 0
         self.fuel = 100
+        self.origin_port_index = self._sample_random_port()
         self.destination_port_index = self._sample_random_port()
 
-        destination_port = self.port_positions[self.destination_port_index]
-        self.np_game[destination_port[0], destination_port[1]] = Entity.BOAT
-        self.ship_position = destination_port
+        # Ensure that origin is different from destination
+        while self.origin_port_index == self.destination_port_index:
+            self.destination_port_index = self._sample_random_port()
+
+        current_port = self.port_positions[self.origin_port_index]
+        self.np_game[current_port[0], current_port[1]] = Entity.BOAT
+        self.ship_position = current_port
 
         return self._build_state()
 
@@ -354,7 +365,7 @@ class Environment:
     
     def _select_port(self, value):
         if 0 <= value < len(self.port_positions):
-            if self.destination_port_index == value: raise Exception("Destination port must be different from current one")
+            if self.origin_port_index == value: raise Exception("Destination port must be different from current one")
             self.destination_port_index = value
         else: raise IndexError("Port index is out of range")
 
@@ -418,6 +429,7 @@ class Environment:
             reward += drop_off * 2
             self.cargo += pick_up
 
+            self.origin_port_index = self.destination_port_index
             self.destination_port_index = None
             reward += 100
 
