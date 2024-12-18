@@ -5,6 +5,10 @@ import random
 from .type import Color, Entity, ActionType, ShipMove
 from .util import calculate_euclidean_distance, normalize
 
+class Initial:
+    CARGO = 0
+    FUEL = 200
+
 class Reward:
     CARGO_DELIVER = 2
     REACH_DESTINATION = 100
@@ -25,8 +29,8 @@ class Environment:
         self.port_cargo = []
 
         self.ship_position = []
-        self.cargo = 0
-        self.fuel = 200
+        self.cargo = Initial.CARGO
+        self.fuel = Initial.FUEL
         self.origin_port_index = None
         self.destination_port_index = None
 
@@ -132,7 +136,7 @@ class Environment:
             cv2.destroyAllWindows()
             exit()
 
-    def _is_ship_at_port(self):
+    def _get_current_port_idx(self):
         """
         Determines which port ship is currently on and returns the index of that port.
         If the ship is not at any port, function returns `None`
@@ -144,13 +148,7 @@ class Environment:
     
     def _sample_random_port(self):
         if len(self.port_positions) == 0: raise Exception("No ports available")
-        random_destination_index = random.randint(0, len(self.port_positions) - 1)
-
-        # ** Choose a new port rather than a port ship is currently on
-        while random_destination_index == self.origin_port_index:
-            random_destination_index = random.randint(0, len(self.port_positions) - 1)
-
-        return random_destination_index
+        return random.randint(0, len(self.port_positions) - 1)
     
     def _sample_random_cargo(self, port_idx):
         return random.randint(1, self.port_cargo[port_idx])
@@ -165,15 +163,16 @@ class Environment:
     def _calculate_cargo_loss(self):
         """
         Generate cargo loss using a custom probabilistic approach with random.
-        
-        Args:
-            total_cargo (int): Total amount of cargo
-        
+
         Returns:
             int: Amount of cargo lost
         """
         # Generate a random number to determine loss type
         loss_type = random.random()
+
+        # No cargo should have no chance of losing any
+        if self.cargo == 0:
+            return 0
 
         # Low probability of losing nothing (10% chance)
         if loss_type < 0.1:
@@ -222,8 +221,8 @@ class Environment:
     def reset(self):
         self.np_game[((self.np_game == Entity.BOAT) + (self.np_game == Entity.TRAVEL))] = Entity.WATER
 
-        self.cargo = 0
-        self.fuel = 100
+        self.cargo = Initial.CARGO
+        self.fuel = Initial.FUEL
         self.origin_port_index = self._sample_random_port()
         self.destination_port_index = self._sample_random_port()
 
@@ -238,15 +237,20 @@ class Environment:
         return self._build_state()
 
     def sample_action(self):
-        current_port_idx = self._is_ship_at_port()
-        if self.destination_port_index == None:
-            # If no destination port selected, randomly return an index
-            return [ActionType.SELECT_PORT, self._sample_random_port()]
+        current_port_idx = self._get_current_port_idx()
+        if self.destination_port_index is None and current_port_idx is not None:
+            # If no destination port selected and currently at port, randomly return an index
+
+            # ** Get a port that is not my current port
+            port_index = self._sample_random_port()
+            while port_index == current_port_idx: port_index = self._sample_random_port()
+
+            return [ActionType.SELECT_PORT, port_index]
         elif self.cargo == 0 and current_port_idx is not None:
-            # If destination port selected, but no cargo
+            # If destination port selected and currently at port, but no cargo
             return [ActionType.TAKE_CARGO, self._sample_random_cargo(current_port_idx)]
         elif self.fuel == 0 and current_port_idx is not None:
-            # If destination port selected, but no fuel
+            # If destination port selected and currently at port, but no fuel
             return [ActionType.TAKE_FUEL, self._sample_random_fuel(current_port_idx)]
         else:
             # If destination port is selected, move a random location
@@ -315,7 +319,7 @@ class Environment:
         return reward, done
     
     def _take_cargo(self, value):
-        current_port_idx = self._is_ship_at_port()
+        current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
 
         if 0 < value <= self.port_cargo[current_port_idx]: self.cargo = value
@@ -324,7 +328,7 @@ class Environment:
         return 0, False
 
     def _take_fuel(self, value):
-        current_port_idx = self._is_ship_at_port()
+        current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
 
         if 0 < value <= self.port_fuel[current_port_idx]: self.fuel = value
