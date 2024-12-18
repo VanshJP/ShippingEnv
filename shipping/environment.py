@@ -5,6 +5,16 @@ import random
 from .type import Color, Entity, ActionType, ShipMove
 from .util import calculate_euclidean_distance, normalize
 
+class Reward:
+    CARGO_DELIVER = 2
+    REACH_DESTINATION = 100
+
+class Penalty:
+    RUN_OUT_OF_FUEL = 10
+    MOVE_ON_GROUND = 5
+    MOVE_ON_WATER = 1
+    CARGO_LOSS = 3
+
 class Environment:
     def __init__(self, map_path, game_size=(100,100)):
         # ** Configurations
@@ -266,17 +276,17 @@ class Environment:
         # ** Check if ship has enough fuel to move to desired space
         fuel_cost = self._calculate_fuel_cost([ship_x, ship_y], [new_x, new_y])
         if self.fuel < fuel_cost:
-            reward -= 10
+            reward -= Penalty.RUN_OUT_OF_FUEL
             done = True
 
         # ** Manuvering process
         if self.np_game[new_x, new_y] == Entity.GROUND:
-            reward -= 5
+            reward -= Penalty.MOVE_ON_GROUND
         else: 
             # ** Move ship
             self.ship_position = [new_x, new_y]
             self.fuel -= fuel_cost
-            reward -= 1
+            reward -= Penalty.MOVE_ON_WATER
 
             # ** Update graphics
             self.np_game[ship_x, ship_y] = Entity.TRAVEL
@@ -288,19 +298,19 @@ class Environment:
         if random.random() <= likelihood_of_losing_cargo:
             cargo_loss = self._calculate_cargo_loss()
             self.cargo -= cargo_loss
-            reward -= cargo_loss * 3
+            reward -= cargo_loss * Penalty.CARGO_LOSS
 
         if self.ship_position == self.port_positions[self.destination_port_index]:
             drop_off, pick_up = self.cargo, self.port_cargo[self.destination_port_index]
 
             # ** Process cargo
             self.cargo = 0
-            reward += drop_off * 2
+            reward += drop_off * Reward.CARGO_DELIVER
             self.cargo += pick_up
 
             self.origin_port_index = self.destination_port_index
             self.destination_port_index = None
-            reward += 100
+            reward += Reward.REACH_DESTINATION
 
         return reward, done
     
