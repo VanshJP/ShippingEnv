@@ -8,6 +8,7 @@ from .util import calculate_euclidean_distance, normalize
 class Initial:
     CARGO = 0
     FUEL = 200
+    MAX_CARGO_CAPACITY = 50
 
 class Reward:
     CARGO_DELIVER = 2
@@ -310,7 +311,7 @@ class Environment:
             reward += Penalty.FARTHER_FROM_DESTINATION
 
         # ** Losing cargo process
-        min_capacity, max_capacity = 0, 50
+        min_capacity, max_capacity = 0, Initial.MAX_CARGO_CAPACITY
         likelihood_of_losing_cargo = normalize(self.cargo, max_capacity, min_capacity)
         if random.random() <= likelihood_of_losing_cargo:
             cargo_loss = self._calculate_cargo_loss()
