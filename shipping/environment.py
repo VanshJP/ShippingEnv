@@ -324,7 +324,6 @@ class Environment:
             # ** Process cargo
             self.cargo = 0
             reward += drop_off * Reward.CARGO_DELIVER
-            self.cargo += pick_up
 
             self.origin_port_index = self.destination_port_index
             self.destination_port_index = None
