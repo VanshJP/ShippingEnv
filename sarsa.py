@@ -6,7 +6,7 @@ from shipping import environment
 
 class SARSAAgent:
     def __init__(self, env, learning_rate=0.1, discount_factor=0.9, exploration_rate=1.0, min_exploration_rate=0.0001,
-                 exploration_decay_rate=0.997):
+                 exploration_decay_rate=0.999):
         self.env = env
 
         # Q-table to store state-action values
@@ -24,10 +24,10 @@ class SARSAAgent:
         ship_pos = tuple(state['ship']['position'])
 
         # Discretize fuel into buckets
-        #fuel_bucket = min(int(state['ship']['fuel'] / 20), 4)
+        fuel_bucket = min(int(state['ship']['fuel'] / 20), 4)
 
         # Discretize cargo into buckets
-        #cargo_bucket = min(int(state['ship']['cargo'] / 10), 4)
+        cargo_bucket = min(int(state['ship']['cargo'] / 10), 4)
 
         # Convert destination port to an index or -1 if None
         dest_port = state['ship']['destination_port_index'] if state['ship']['destination_port_index'] is not None else -1
@@ -35,7 +35,7 @@ class SARSAAgent:
         prev_port = state['ship']['origin_port_index'] if state['ship']['origin_port_index'] is not None else -1
 
         # Return a tuple that can be used as a dictionary key
-        return (ship_pos, dest_port, prev_port)
+        return (ship_pos, cargo_bucket, fuel_bucket, prev_port, dest_port)
 
     def get_q_value(self, state, action):
         return self.q_table.get((state, action), 0.0)
@@ -167,12 +167,13 @@ class SARSAAgent:
         self.epsilon = max(self.min_epsilon, self.epsilon * self.epsilon_decay)
 
 
-def train_agent(env, num_episodes= 250000):
+def train_agent(env, num_episodes= 10000):
     # Initialize the agent with the environment
     agent = SARSAAgent(env)
     detailed_rewards = dict()
 
     for episode in range(num_episodes):
+        print(f'Episode {episode}')
         # Reset the environment
         state = env.reset()
 
@@ -209,17 +210,13 @@ def train_agent(env, num_episodes= 250000):
             # Move to the next state and action
             state = next_state
             action = next_action
-            if action[0] == 3 or action[0] == 4:
-                print("miracle")
-
 
         # Decay exploration
         agent.decay_exploration()
 
-
-        if episode % 500 == 0:
-            if episode == num_episodes - 500:
-                avg_rewards = test_policy(env, agent, False)
+        if episode % 100 == 0:
+            if episode == num_episodes - 100:
+                avg_rewards = test_policy(env, agent, True)
             else:
                 avg_rewards = test_policy(env, agent, False)
             for start_spot, reward in avg_rewards:
@@ -227,17 +224,13 @@ def train_agent(env, num_episodes= 250000):
                     detailed_rewards[start_spot] = []
                 detailed_rewards[start_spot].append((episode, reward))
 
-            #rewardsOverTime.append(avg_reward)
-            #print("Episode: ", episode, detailed_rewards.items())
-            print(episode)
-
     graphRewards(detailed_rewards, num_episodes)
     return agent
 
 def test_policy(env, agent, doRender = False, test_episodes = 10):
     """Evaluate the current policy by running a few episodes without exploration."""
     totalReward_per_StartSpot = defaultdict(list)
-    for _ in range(test_episodes):
+    for i in range(test_episodes):
         state = env.reset()
         startingSpot = state['ship']['origin_port_index']
         done = False
@@ -262,9 +255,9 @@ def test_policy(env, agent, doRender = False, test_episodes = 10):
                     except:
                         continue
 
-            if doRender:
+            if doRender and i == 9:
                 env.render_real_time()
-                print(action)
+
             state = next_state
             episode_reward += reward
 
