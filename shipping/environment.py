@@ -145,7 +145,7 @@ class Environment:
         If the ship is not at any port, function returns `None`
         """
         for idx, port_position in enumerate(self.port_positions):
-            if port_position == self.port_positions:
+            if port_position == self.ship_position:
                 return idx
         return None
     
