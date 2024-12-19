@@ -335,7 +335,7 @@ class Environment:
         current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
 
-        if 0 < value <= self.port_cargo[current_port_idx]: self.cargo = value
+        if 0 < value <= self.port_cargo[current_port_idx]: self.cargo += value
         else: raise ValueError("Invalid fuel amount")
 
         return 0, False
@@ -344,7 +344,7 @@ class Environment:
         current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
 
-        if 0 < value <= self.port_fuel[current_port_idx]: self.fuel = value
+        if 0 < value <= self.port_fuel[current_port_idx]: self.fuel += value
         else: raise ValueError("Invalid fuel amount")
 
         return 0, False
