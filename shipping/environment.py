@@ -5,7 +5,6 @@ import random
 from .type import Color, Entity, ActionType, ShipMove
 from .util import calculate_euclidean_distance, normalize
 
-
 class Initial:
     CARGO = 0
     FUEL = 200
@@ -13,18 +12,15 @@ class Initial:
 
 class Reward:
     CARGO_DELIVER = 2
-    REACH_DESTINATION = 10
+    REACH_DESTINATION = 100
     CLOSER_TO_DESTINATION = 2
-    TAKE_FUEL = 0.05
-    TAKE_CARGO = 0.05
 
 class Penalty:
     RUN_OUT_OF_FUEL = -10
     MOVE_ON_GROUND = -5
     MOVE_ON_WATER = -1
     CARGO_LOSS = -3
-    FARTHER_FROM_DESTINATION = -2
-    USE_FUEL = -0.0001
+    FARTHER_FROM_DESTINATION = -10
 
 class Environment:
     def __init__(self, map_path, game_size=(100, 100)):
@@ -156,7 +152,7 @@ class Environment:
     def _sample_random_port(self):
         if len(self.port_positions) == 0: raise Exception("No ports available")
         return random.randint(0, len(self.port_positions) - 1)
-
+    
     def _sample_random_cargo(self, port_idx):
         return random.randint(1, self.port_cargo[port_idx])
 
@@ -254,11 +250,9 @@ class Environment:
 
             return [ActionType.SELECT_PORT, port_index]
         elif self.cargo == 0 and current_port_idx is not None:
-            #print("are we here2")
             # If destination port selected and currently at port, but no cargo
             return [ActionType.TAKE_CARGO, self._sample_random_cargo(current_port_idx)]
         elif self.fuel == 0 and current_port_idx is not None:
-            #print("are we here")
             # If destination port selected and currently at port, but no fuel
             return [ActionType.TAKE_FUEL, self._sample_random_fuel(current_port_idx)]
         else:
@@ -269,8 +263,7 @@ class Environment:
         if 0 <= value < len(self.port_positions):
             if self.origin_port_index == value: raise Exception("Destination port must be different from current one")
             self.destination_port_index = value
-        else:
-            raise IndexError("Port index is out of range")
+        else: raise IndexError("Port index is out of range")
 
         return 0, False
 
@@ -297,7 +290,7 @@ class Environment:
         # ** Manuvering process
         if self.np_game[new_x, new_y] == Entity.GROUND:
             reward += Penalty.MOVE_ON_GROUND
-        else:
+        else: 
             # ** Move ship
             self.ship_position = [new_x, new_y]
             self.fuel -= fuel_cost
@@ -332,16 +325,9 @@ class Environment:
             # ** Process cargo
             self.cargo = 0
             reward += drop_off * Reward.CARGO_DELIVER
-            #self.cargo += pick_up
 
             self.origin_port_index = self.destination_port_index
-            #self.destination_port_index = None
-
-            self.destination_port_index = self._sample_random_port()
-            while self.origin_port_index == self.destination_port_index:
-                self.destination_port_index = self._sample_random_port()
-            #print("Found DESTINATION!!!")
-
+            self.destination_port_index = None
             reward += Reward.REACH_DESTINATION
 
         return reward, done
@@ -350,10 +336,8 @@ class Environment:
         current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
 
-        if 0 < value <= self.port_cargo[current_port_idx]:
-            self.cargo += value
-        else:
-            raise ValueError("Invalid Cargo amount")
+        if 0 < value <= self.port_cargo[current_port_idx]: self.cargo += value
+        else: raise ValueError("Invalid fuel amount")
 
         return Reward.TAKE_CARGO, False
 
@@ -361,10 +345,8 @@ class Environment:
         current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
 
-        if 0 < value <= self.port_fuel[current_port_idx]:
-            self.fuel += value
-        else:
-            raise ValueError("Invalid fuel amount")
+        if 0 < value <= self.port_fuel[current_port_idx]: self.fuel += value
+        else: raise ValueError("Invalid fuel amount")
 
         return Reward.TAKE_FUEL, False
 
