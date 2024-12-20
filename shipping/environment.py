@@ -23,7 +23,7 @@ class Penalty:
     FARTHER_FROM_DESTINATION = -10
 
 class Environment:
-    def __init__(self, map_path, game_size=(100, 100)):
+    def __init__(self, map_path, game_size=(100,100)):
         # ** Configurations
         self.size_game = game_size
 
@@ -42,7 +42,7 @@ class Environment:
     def _initialize_map(self, map_path):
         self.np_game = cv2.imread(map_path, cv2.IMREAD_GRAYSCALE)
         if self.np_game is None: raise FileNotFoundError(f"Cannot read the image at {map_path}")
-
+        
         x_min, x_max = 100, 300
         y_min, y_max = 50, 200
 
@@ -50,7 +50,7 @@ class Environment:
         self.np_game = cv2.resize(self.np_game, self.size_game, interpolation=cv2.INTER_AREA)
         _, self.np_game = cv2.threshold(self.np_game, 128, 1, cv2.THRESH_BINARY)
         self.np_game = self.np_game.astype(int)
-
+    
     def add_port(self, pos):
         x, y = pos[0], pos[1]
         if not self._is_within_map(x, y):
@@ -60,7 +60,7 @@ class Environment:
         self.port_fuel.append(random.randint(5, 20))
         self.port_cargo.append(random.randint(5, 20))
         self.np_game[x, y] = Entity.PORT
-
+    
     def remove_port(self, idx):
         if 0 <= idx < self.port_positions and 0 <= idx < self.port_cargo:
             x, y = self.port_positions[idx]
@@ -75,8 +75,8 @@ class Environment:
         """
         Checks if the given coordinates are within the game map boundaries.
 
-        This method determines whether the specified x and y coordinates
-        fall inside the game's map dimensions. It verifies that the coordinates
+        This method determines whether the specified x and y coordinates 
+        fall inside the game's map dimensions. It verifies that the coordinates 
         are non-negative and less than the map's width and height.
 
         Args:
@@ -84,7 +84,7 @@ class Environment:
             y (int): The y-coordinate to check.
 
         Returns:
-            bool: True if the coordinates are within the map boundaries,
+            bool: True if the coordinates are within the map boundaries, 
                 False otherwise.
 
         Example:
@@ -102,7 +102,7 @@ class Environment:
 
     def render_real_time(self, render_size=(355, 533)):
         np_render = np.zeros((self.np_game.shape[0], self.np_game.shape[1], 3), dtype="uint8")
-
+        
         np_render[self.np_game == Entity.WATER] = Color.WATER
         np_render[self.np_game == Entity.GROUND] = Color.GROUND
 
@@ -121,7 +121,7 @@ class Environment:
 
         frame_resized = cv2.resize(np_render, render_size, interpolation=cv2.INTER_AREA)
         font = cv2.FONT_HERSHEY_SIMPLEX
-
+        
         # Display stats
         cv2.putText(frame_resized, f"Fuel: {self.fuel:.2f}", (10, 20), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
         cv2.putText(frame_resized, f"Cargo: {self.cargo}", (10, 40), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
@@ -129,8 +129,8 @@ class Environment:
         # Display port info
         port_info_y = 80
         for idx in range(len(self.port_positions)):
-            cv2.putText(frame_resized, f"P{idx + 1} - Cargo: {self.port_cargo[idx]} - Fuel: {self.port_fuel[idx]}",
-                        (10, port_info_y), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(frame_resized, f"P{idx + 1} - Cargo: {self.port_cargo[idx]} - Fuel: {self.port_fuel[idx]}", 
+                       (10, port_info_y), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
             port_info_y += 20
 
         cv2.imshow("Environment", frame_resized)
@@ -148,7 +148,7 @@ class Environment:
             if port_position == self.ship_position:
                 return idx
         return None
-
+    
     def _sample_random_port(self):
         if len(self.port_positions) == 0: raise Exception("No ports available")
         return random.randint(0, len(self.port_positions) - 1)
@@ -158,11 +158,11 @@ class Environment:
 
     def _sample_random_fuel(self, port_idx):
         return random.randint(1, self.fuel[port_idx])
-
+    
     def _sample_random_move(self):
         moves_list = [ShipMove.NORTH, ShipMove.EAST, ShipMove.SOUTH, ShipMove.WEST]
         return random.choice(moves_list)
-
+    
     def _calculate_cargo_loss(self):
         """
         Generate cargo loss using a custom probabilistic approach with random.
@@ -180,22 +180,22 @@ class Environment:
         # Low probability of losing nothing (10% chance)
         if loss_type < 0.1:
             return 0
-
+        
         # Low probability of losing everything (10% chance)
         elif loss_type > 0.9:
             return self.cargo
-
+        
         # Medium probability of losing some cargo (80% of cases)
         else:
             # Use beta distribution to create a more nuanced loss
             # beta generates a value between 0 and 1
             beta_loss = random.betavariate(2, 2)
-
+            
             # Scale the beta distribution to cargo amount
             loss = int(beta_loss * self.cargo)
-
+            
             return loss
-
+    
     def _build_state(self):
         ship = {
             "position": self.ship_position,
@@ -258,7 +258,7 @@ class Environment:
         else:
             # If destination port is selected, move a random location
             return [ActionType.MOVE_SHIP, self._sample_random_move()]
-
+    
     def _select_port(self, value):
         if 0 <= value < len(self.port_positions):
             if self.origin_port_index == value: raise Exception("Destination port must be different from current one")
@@ -266,7 +266,7 @@ class Environment:
         else: raise IndexError("Port index is out of range")
 
         return 0, False
-
+        
     def _move_ship(self, move):
         if len(move) != 2: raise ValueError("Move needs to be of format (x,y) or [x, y]")
         # Select port first before moving ship
@@ -277,7 +277,6 @@ class Environment:
         move_x, move_y = move
         ship_x, ship_y = self.ship_position
         new_x, new_y = ship_x + move_x, ship_y + move_y
-        reward += Penalty.USE_FUEL
 
         if not self._is_within_map(new_x, new_y): raise ValueError("Move is out of range")
 
@@ -331,7 +330,7 @@ class Environment:
             reward += Reward.REACH_DESTINATION
 
         return reward, done
-
+    
     def _take_cargo(self, value):
         current_port_idx = self._get_current_port_idx()
         if current_port_idx is None: raise Exception("Not currently at port")
@@ -339,7 +338,7 @@ class Environment:
         if 0 < value <= self.port_cargo[current_port_idx]: self.cargo += value
         else: raise ValueError("Invalid fuel amount")
 
-        return Reward.TAKE_CARGO, False
+        return 0, False
 
     def _take_fuel(self, value):
         current_port_idx = self._get_current_port_idx()
@@ -348,7 +347,7 @@ class Environment:
         if 0 < value <= self.port_fuel[current_port_idx]: self.fuel += value
         else: raise ValueError("Invalid fuel amount")
 
-        return Reward.TAKE_FUEL, False
+        return 0, False
 
     def step(self, action):
         if len(self.port_positions) == 0: raise Exception("No ports available")
@@ -366,5 +365,5 @@ class Environment:
                 reward, done = self._move_ship(action_value)
             case _:
                 raise ValueError("Action category unknown")
-
+        
         return self._build_state(), reward, done, meta
