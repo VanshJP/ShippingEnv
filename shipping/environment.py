@@ -238,26 +238,28 @@ class Environment:
         self.ship_position = current_port
 
         return self._build_state()
-
+    
     def sample_action(self):
         current_port_idx = self._get_current_port_idx()
-        if self.destination_port_index is None and current_port_idx is not None:
-            # If no destination port selected and currently at port, randomly return an index
-
-            # ** Get a port that is not my current port
-            port_index = self._sample_random_port()
-            while port_index == current_port_idx: port_index = self._sample_random_port()
-
-            return [ActionType.SELECT_PORT, port_index]
-        elif self.cargo == 0 and current_port_idx is not None:
-            # If destination port selected and currently at port, but no cargo
-            return [ActionType.TAKE_CARGO, self._sample_random_cargo(current_port_idx)]
-        elif self.fuel == 0 and current_port_idx is not None:
-            # If destination port selected and currently at port, but no fuel
-            return [ActionType.TAKE_FUEL, self._sample_random_fuel(current_port_idx)]
-        else:
-            # If destination port is selected, move a random location
+        if current_port_idx is None:
             return [ActionType.MOVE_SHIP, self._sample_random_move()]
+        else:
+            choice = random.choice([ActionType.MOVE_SHIP, ActionType.SELECT_PORT, ActionType.TAKE_CARGO, ActionType.TAKE_FUEL])
+            match choice:
+                case ActionType.SELECT_PORT:
+                    port_index = self._sample_random_port()
+                    while port_index == current_port_idx: port_index = self._sample_random_port()
+
+                    return [ActionType.SELECT_PORT, port_index]
+                case ActionType.MOVE_SHIP:
+                    return [ActionType.MOVE_SHIP, self._sample_random_move()]
+                case ActionType.TAKE_CARGO:
+                    return [ActionType.TAKE_CARGO, self._sample_random_cargo(current_port_idx)]
+                case ActionType.TAKE_FUEL:
+                    return [ActionType.TAKE_FUEL, self._sample_random_fuel(current_port_idx)]
+                case _:
+                    raise ValueError("Action category unknown")
+                
     
     def _select_port(self, value):
         if 0 <= value < len(self.port_positions):
