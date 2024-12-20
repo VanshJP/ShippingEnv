@@ -1,6 +1,5 @@
 import cv2
 import sarsa
-import mcts
 from shipping import Environment
 
 if __name__ == "__main__":
@@ -22,7 +21,6 @@ if __name__ == "__main__":
             env.render_real_time()
             if done: break
         '''
-        mcts.train_agent(env)
         sarsa.train_agent(env)
     except KeyboardInterrupt:
         cv2.destroyAllWindows()
