@@ -12,15 +12,18 @@ class Initial:
 
 class Reward:
     CARGO_DELIVER = 2
-    REACH_DESTINATION = 100
+    REACH_DESTINATION = 10
     CLOSER_TO_DESTINATION = 2
+    TAKE_FUEL = 0.05
+    TAKE_CARGO = 0.05
 
 class Penalty:
     RUN_OUT_OF_FUEL = -10
     MOVE_ON_GROUND = -5
     MOVE_ON_WATER = -1
     CARGO_LOSS = -3
-    FARTHER_FROM_DESTINATION = -10
+    FARTHER_FROM_DESTINATION = -2
+    USE_FUEL = -0.0001
 
 class Environment:
     def __init__(self, map_path, game_size=(100,100)):
@@ -293,6 +296,7 @@ class Environment:
             # ** Move ship
             self.ship_position = [new_x, new_y]
             self.fuel -= fuel_cost
+            reward += Penalty.USE_FUEL
             reward += Penalty.MOVE_ON_WATER
 
             # ** Update graphics
@@ -326,7 +330,10 @@ class Environment:
             reward += drop_off * Reward.CARGO_DELIVER
 
             self.origin_port_index = self.destination_port_index
-            self.destination_port_index = None
+            self.destination_port_index = self._sample_random_port()
+            while self.origin_port_index == self.destination_port_index:
+                self.destination_port_index = self._sample_random_port()
+
             reward += Reward.REACH_DESTINATION
 
         return reward, done
@@ -338,7 +345,7 @@ class Environment:
         if 0 < value <= self.port_cargo[current_port_idx]: self.cargo += value
         else: raise ValueError("Invalid fuel amount")
 
-        return 0, False
+        return Reward.TAKE_CARGO, False
 
     def _take_fuel(self, value):
         current_port_idx = self._get_current_port_idx()
@@ -347,7 +354,7 @@ class Environment:
         if 0 < value <= self.port_fuel[current_port_idx]: self.fuel += value
         else: raise ValueError("Invalid fuel amount")
 
-        return 0, False
+        return Reward.TAKE_FUEL, False
 
     def step(self, action):
         if len(self.port_positions) == 0: raise Exception("No ports available")
