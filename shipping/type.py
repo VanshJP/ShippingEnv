@@ -4,14 +4,17 @@ class ActionType:
     TAKE_FUEL = 3
     TAKE_CARGO = 4
 
+
 class ShipMove:
     """
-    Enum for action space where values are (x,y) tuple 
+    Enum for action space where values are (x,y) tuple
     """
+
     NORTH = (0, -1)
     SOUTH = (0, 1)
     EAST = (-1, 0)
     WEST = (1, 0)
+
 
 class Entity:
     """
@@ -25,6 +28,7 @@ class Entity:
     BOAT = 5
     STORM = 6
     TRAVEL = 7
+
 
 class Color:
     """
